@@ -1,5 +1,4 @@
-#include <array>
-#include <iostream>
+#include <string>
 
 template <int N>
 constexpr auto count_width(const char (&fmt)[N])
@@ -16,76 +15,72 @@ constexpr auto count_width(const char (&fmt)[N])
 }
 
 
-template<int N>
-struct add_color
+constexpr bool is_specifier(char c)
 {
-    constexpr add_color(const char* fmt)
-        :m_data{'\0'}
+    char spec[] = "csdioxXufFeEaAgGnp";
+    for(int i = 0; i < sizeof(spec) / sizeof(spec[0]); i++)
+        if(c == spec[i])
+            return true;
+    return false;
+}
+
+
+template<int DATA_SIZE, int FMT_SIZE>
+constexpr auto add_color(const char (&fmt)[FMT_SIZE])
+{
+    union data_t{char value[DATA_SIZE] = {'\0'};};
+    data_t data;
+    int data_pos = 0;
+    for(int i = 0 ; i < FMT_SIZE; i++)
     {
-        int data_pos = 0;
-        for(int i = 0 ; fmt[i] != '\0'; i++)
+        if(fmt[i] == '%')
         {
-            if(fmt[i] == '%')
+            if(fmt[i+1] == '%')
             {
-                if(fmt[i+1] == '%')
-                {
-                    m_data[i + data_pos] = '%';
-                    m_data[++i + data_pos] = '%';
-                }
-                else
-                {
-                    int color_pos = 0;
-                    m_data[i + data_pos] = '\e';
-                    m_data[i + ++data_pos] = '[';
-                    m_data[i + ++data_pos] = '9';
-                    m_data[color_pos = (i + ++data_pos)] = '0';
-                    m_data[i + ++data_pos] = 'm';
-                    m_data[i + ++data_pos] = fmt[i];
-                    while( !is_specifier(fmt[++i]))
-                    {
-                        m_data[i + data_pos] = fmt[i];
-                    }
-                    m_data[color_pos] = (fmt[i] == 's') ? '5' : '2';;
-                    m_data[i + data_pos] = fmt[i];
-                    m_data[i + ++data_pos] = '\e';
-                    m_data[i + ++data_pos] = '[';
-                    m_data[i + ++data_pos] = '0';
-                    m_data[i + ++data_pos] = 'm';
-                }
+                data.value[i + data_pos] = '%';
+                data.value[++i + data_pos] = '%';
             }
             else
             {
-                m_data[i + data_pos] = fmt[i];
+                int color_pos = 0;
+                data.value[i + data_pos] = '\e';
+                data.value[i + ++data_pos] = '[';
+                data.value[i + ++data_pos] = '9';
+                data.value[color_pos = (i + ++data_pos)] = '0';
+                data.value[i + ++data_pos] = 'm';
+                data.value[i + ++data_pos] = fmt[i];
+                while( !is_specifier(fmt[++i]))
+                {
+                    data.value[i + data_pos] = fmt[i];
+                }
+                data.value[color_pos] = (fmt[i] == 's') ? '5' : '2';
+                data.value[i + data_pos] = fmt[i];
+                data.value[i + ++data_pos] = '\e';
+                data.value[i + ++data_pos] = '[';
+                data.value[i + ++data_pos] = '0';
+                data.value[i + ++data_pos] = 'm';
             }
         }
+        else
+        {
+            data.value[i + data_pos] = fmt[i];
+        }
     }
-
-    constexpr bool is_specifier(char c)
-    {
-        char spec[] = "csdioxXufFeEaAgGnp";
-        for(int i = 0; i < sizeof(spec) / sizeof(spec[0]); i++)
-            if(c == spec[i])
-                return true;
-        return false;
-    }
-
-    const char* data()const noexcept{return m_data;}
+    return data;
+}
 
 
-private:
-    char m_data[N];
-};
 
-#define STR "[%10.10s] = [%d]\n"
+#define COLOR_FMT(fmt) []{ \
+     static constexpr auto data = add_color<count_width(fmt)>(fmt); \
+     return data.value;}()
 
-#define color_print(fmt, ...) \
-    printf(add_color< count_width(fmt)>(fmt).data(), ##__VA_ARGS__)
+
+#define STR "[ %-12.12s] = [%d]\n"
 
 int main()
 {
-    constexpr auto fmt = add_color< count_width(STR) >(STR);
-    std::cout << fmt.data() << std::endl;
+    printf(COLOR_FMT(STR), "hello world", 10);
 
-    color_print(STR, "helow world", 10);
     return 0;
 }

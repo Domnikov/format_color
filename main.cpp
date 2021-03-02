@@ -1,5 +1,7 @@
 #include <string>
 
+namespace{
+
 template <int N>
 constexpr auto count_width(const char (&fmt)[N])
 {
@@ -70,6 +72,7 @@ constexpr auto add_color(const char (&fmt)[FMT_SIZE])
 }
 
 
+}
 
 #define COLOR_FMT(fmt) []{ \
      static constexpr auto data = add_color<count_width(fmt)>(fmt); \
